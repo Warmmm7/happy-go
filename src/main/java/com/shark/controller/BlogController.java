@@ -1,6 +1,7 @@
 package com.shark.controller;
 
 
+import com.baomidou.mybatisplus.extension.conditions.query.QueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.shark.dto.Result;
 import com.shark.dto.UserDTO;
@@ -81,5 +82,15 @@ public class BlogController {
     @GetMapping("/likes/{id}")
     public Result queryBlogLikes(@PathVariable("id") Long id){
         return blogService.queryBlogLikes(id);
+    }
+
+    @GetMapping("/of/user")
+    public Result queryBlogUserId(
+            @RequestParam(value = "current",defaultValue = "1") Integer current,
+            @RequestParam("id") Long id){
+        //当前页...
+        Page<Blog> page = blogService.query().eq("user_id", id).page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+        List<Blog> records = page.getRecords();
+        return Result.ok(records);
     }
 }

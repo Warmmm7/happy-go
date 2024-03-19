@@ -1,9 +1,11 @@
 package com.shark.controller;
 
 
+import cn.hutool.core.bean.BeanUtil;
 import com.shark.dto.LoginFormDTO;
 import com.shark.dto.Result;
 import com.shark.dto.UserDTO;
+import com.shark.entity.User;
 import com.shark.entity.UserInfo;
 import com.shark.service.IUserInfoService;
 import com.shark.service.IUserService;
@@ -73,5 +75,20 @@ public class UserController {
         info.setUpdateTime(null);
         // 返回
         return Result.ok(info);
+    }
+
+    /**
+     * 用户查id
+     * @param userId
+     * @return
+     */
+    @GetMapping("/{id}")
+    public Result queryUserById(@PathVariable("id") Long userId){
+        User user = userService.getById(userId);
+        if(user == null){
+            return Result.fail("用户不存在");
+        }
+        UserDTO userDTO = BeanUtil.copyProperties(user,UserDTO.class);
+        return Result.ok(userDTO);
     }
 }
