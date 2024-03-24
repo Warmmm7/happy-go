@@ -1,5 +1,6 @@
 package com.shark.service.impl;
 
+import cn.hutool.core.io.resource.ClassPathResource;
 import com.shark.dto.Result;
 import com.shark.entity.SeckillVoucher;
 import com.shark.entity.Voucher;
@@ -16,11 +17,15 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Service
 @Slf4j
@@ -36,24 +41,54 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     private RedissonClient redissonClient;
 
-    public Result seckillVoucher(Long voucherId) {
-        //查询id 优惠券
-        SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
-        //判断秒杀是否开始 结束。。
-        if (voucher.getBeginTime().isAfter(LocalDateTime.now())) {
-            //还没开始 返回错误提示
-            return Result.fail("抢购尚未开始...");
-        }
-        if (voucher.getEndTime().isBefore(LocalDateTime.now())) {
-            //抢购已经结束啦！
-            return Result.fail("抢购已经结束...");
-        }
-        //判断库存是否足够...
-        if (voucher.getStock() < 1) {
-            return Result.fail("商品暂无...");
-        }
-        return createVoucherOrder(voucherId);
+    private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
 
+    static {
+        SECKILL_SCRIPT = new DefaultRedisScript<>();
+        SECKILL_SCRIPT.setLocation((org.springframework.core.io.Resource) new ClassPathResource("seckill.lua"));
+        SECKILL_SCRIPT.setResultType(Long.class);
+    }
+
+
+    private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
+
+//    public Result seckillVoucher(Long voucherId) {
+//        //查询id 优惠券
+//        SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
+//        //判断秒杀是否开始 结束。。
+//        if (voucher.getBeginTime().isAfter(LocalDateTime.now())) {
+//            //还没开始 返回错误提示
+//            return Result.fail("抢购尚未开始...");
+//        }
+//        if (voucher.getEndTime().isBefore(LocalDateTime.now())) {
+//            //抢购已经结束啦！
+//            return Result.fail("抢购已经结束...");
+//        }
+//        //判断库存是否足够...
+//        if (voucher.getStock() < 1) {
+//            return Result.fail("商品暂无...");
+//        }
+//        return createVoucherOrder(voucherId);
+//
+//    }
+
+    public Result seckillVoucher(Long voucherId) {
+        Long userId = UserHolder.getUser().getId();
+        long orderId = redisIdWorker.nextId("order");
+        // 1.执行lua脚本
+        Long result = stringRedisTemplate.execute(
+                SECKILL_SCRIPT,
+                Collections.emptyList(),
+                voucherId.toString(), userId.toString(), String.valueOf(orderId)
+        );
+        int r = result.intValue();
+        // 2.判断结果是否为0
+        if (r != 0) {
+            // 2.1.不为0 ，代表没有购买资格
+            return Result.fail(r == 1 ? "库存不足" : "不能重复下单");
+        }
+        // 3.返回订单id
+        return Result.ok(orderId);
     }
 
     @Transactional
