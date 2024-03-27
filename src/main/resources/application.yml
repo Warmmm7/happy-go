@@ -2,16 +2,16 @@ server:
   port: 8081
 spring:
   application:
-    name: shark
+    name: ***
   datasource:
     driver-class-name: com.mysql.jdbc.Driver
-    url: jdbc:mysql://8.137.123.85:3306/happy_go?useSSL=false&serverTimezone=UTC
-    username: root
-    password: 472020
+    url: jdbc:mysql://***/happy_go?useSSL=false&serverTimezone=UTC
+    username: ***
+    password: ***
   redis:
-    host: 8.137.123.85
-    port: 6379
-    password: 472020
+    host: ***
+    port: ***
+    password: ***
     lettuce:
       pool:
         max-active: 10
